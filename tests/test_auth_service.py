@@ -5,6 +5,7 @@ import pytest
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.exceptions import AuthenticationError
+from app.models.role import Role
 from app.models.user import User
 from app.schemas.auth.request import RegisterUserRequest
 from app.services import auth_services as auth_service
@@ -56,13 +57,15 @@ async def test_register_user(db_session):
     assert user.email == "new@example.com"
     assert user.first_name == "New"
     assert user.last_name == "User"
+    assert [role.name for role in user.roles] == ["user"]
 
 def test_create_and_verify_token(db_session):
     user_id = uuid4()
-    token = auth_service.create_access_token("test@example.com", user_id, timedelta(minutes=30))
+    token = auth_service.create_access_token("test@example.com", user_id, ["user"], timedelta(minutes=30))
     
     token_data = auth_service.verify_token(token)
     assert token_data.get_uuid() == user_id
+    assert token_data.roles == ["user"]
 
     # Test invalid credentials
     assert auth_service.authenticate_user("test@example.com", "wrongpassword", db_session) is False
@@ -74,3 +77,9 @@ def test_create_and_verify_token(db_session):
             scope=""
         )
         auth_service.login_for_access_token(form_data, db_session) 
+
+
+def test_ensure_default_roles(db_session):
+    auth_service.ensure_default_roles(db_session)
+    roles = {role.name for role in db_session.query(Role).all()}
+    assert {"user", "admin"}.issubset(roles)

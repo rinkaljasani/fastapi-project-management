@@ -33,3 +33,8 @@ class InvalidPasswordError(UserError):
 class AuthenticationError(HTTPException):
     def __init__(self, message: str = "Could not validate user"):
         super().__init__(status_code=401, detail=message)
+
+
+class AuthorizationError(HTTPException):
+    def __init__(self, message: str = "You do not have permission to perform this action"):
+        super().__init__(status_code=403, detail=message)

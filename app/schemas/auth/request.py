@@ -1,5 +1,5 @@
 from uuid import UUID
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 class RegisterUserRequest(BaseModel):
     email: EmailStr
@@ -13,6 +13,7 @@ class Token(BaseModel):
     
 class TokenData(BaseModel):
     user_id: str | None = None
+    roles: list[str] = Field(default_factory=list)
 
     def get_uuid(self) -> UUID | None:
         if self.user_id:

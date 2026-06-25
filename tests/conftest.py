@@ -9,10 +9,11 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
 from app.main import app
+from app.models.role import Role
 from app.models.todo import Todo
 from app.models.user import User
 from app.schemas.auth.request import TokenData
-from app.services.auth_services import get_password_hash
+from app.services.auth_services import ADMIN_ROLE_NAME, DEFAULT_ROLE_NAME, get_password_hash
 
 
 @pytest.fixture(scope="function")
@@ -44,6 +45,17 @@ def test_user():
 
 
 @pytest.fixture(scope="function")
+def admin_user():
+    return User(
+        id=uuid4(),
+        email="admin@example.com",
+        first_name="Admin",
+        last_name="User",
+        password_hash=get_password_hash("adminpassword123"),
+    )
+
+
+@pytest.fixture(scope="function")
 def test_token_data(test_user):
     return TokenData(user_id=str(test_user.id))
 
@@ -61,6 +73,11 @@ def test_todo(test_token_data):
 
 @pytest.fixture(scope="function")
 def client(db_session):
+    for role_name in (DEFAULT_ROLE_NAME, ADMIN_ROLE_NAME):
+        if not db_session.query(Role).filter(Role.name == role_name).first():
+            db_session.add(Role(name=role_name))
+    db_session.commit()
+
     def override_get_db():
         yield db_session
 
@@ -88,6 +105,26 @@ def auth_headers(client):
         data={
             "username": "test.user@example.com",
             "password": "testpassword123",
+            "grant_type": "password",
+        },
+    )
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture(scope="function")
+def admin_auth_headers(client, db_session, admin_user):
+    admin_role = db_session.query(Role).filter(Role.name == ADMIN_ROLE_NAME).first()
+    admin_user.roles.append(admin_role)
+    db_session.add(admin_user)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/token",
+        data={
+            "username": "admin@example.com",
+            "password": "adminpassword123",
             "grant_type": "password",
         },
     )

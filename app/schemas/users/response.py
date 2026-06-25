@@ -8,5 +8,6 @@ class UserResponse(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
+    roles: list[str]
 
     model_config = ConfigDict(from_attributes=True)

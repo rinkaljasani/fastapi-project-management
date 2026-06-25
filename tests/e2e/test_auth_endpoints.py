@@ -28,6 +28,7 @@ def test_register_and_login_flow(client: TestClient):
     token_data = login_response.json()
     assert "access_token" in token_data
     assert token_data["token_type"] == "bearer"
+    assert token_data["roles"] == ["user"]
 
 def test_login_failures(client: TestClient):
     # Test login with non-existent user

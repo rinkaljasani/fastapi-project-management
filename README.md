@@ -21,6 +21,9 @@ I'm open to hearing your feedback about the template and what you'd like to see 
 # Install all dependencies.
 - Run `pip install -r requirements-dev.txt`
 
+# run seeder 
+-  python -m app.seeders.run_seeders    
+
 # How to run app. Using Docker with PostgreSQL.
 - Install Docker Desktop
 - Run `docker compose up --build`
@@ -33,5 +36,15 @@ I'm open to hearing your feedback about the template and what you'd like to see 
 # How to run tests.
 - Run `pytest` to run all tests
 
+# excute migration
+# alembic init alembic
+# python -m alembic init alembic 
+- python -m alembic revision --autogenerate -m "initial_tables"
+- python -m alembic revision --autogenerate -m "add_email_verification"
 
+# Apply Migration
+- python -m alembic upgrade head
+
+# check migration
+- python -m alembic current
 Cheers!

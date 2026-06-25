@@ -10,13 +10,16 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import DbSession
-from app.core.exceptions import AuthenticationError
+from app.core.exceptions import AuthenticationError, AuthorizationError
+from app.models.role import Role
 from app.models.user import User
 from app.schemas.auth.request import RegisterUserRequest, TokenData
 from app.schemas.auth.response import Token
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+DEFAULT_ROLE_NAME = "user"
+ADMIN_ROLE_NAME = "admin"
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -27,16 +30,38 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
+def ensure_role(db: Session, role_name: str) -> Role:
+    role = db.query(Role).filter(Role.name == role_name).first()
+    if not role:
+        role = Role(name=role_name)
+        db.add(role)
+        db.flush()
+    return role
+
+
+def ensure_default_roles(db: Session) -> None:
+    ensure_role(db, DEFAULT_ROLE_NAME)
+    ensure_role(db, ADMIN_ROLE_NAME)
+    db.commit()
+
+
+def get_user_role_names(user: User) -> list[str]:
+    return sorted(role.name for role in user.roles)
+
+
 def register_user(db: Session, register_user_request: RegisterUserRequest) -> User:
+    ensure_default_roles(db)
     existing_user = db.query(User).filter(User.email == register_user_request.email).first()
     if existing_user:
         raise AuthenticationError("User already exists")
 
+    default_role = ensure_role(db, DEFAULT_ROLE_NAME)
     user = User(
         email=register_user_request.email,
         first_name=register_user_request.first_name,
         last_name=register_user_request.last_name,
         password_hash=get_password_hash(register_user_request.password),
+        roles=[default_role],
     )
     db.add(user)
     db.commit()
@@ -53,9 +78,9 @@ def authenticate_user(email: str, password: str, db: Session) -> User | bool:
     return user
 
 
-def create_access_token(email: str, user_id: UUID, expires_delta: timedelta) -> str:
+def create_access_token(email: str, user_id: UUID, roles: list[str], expires_delta: timedelta) -> str:
     expire = datetime.now(timezone.utc) + expires_delta
-    payload = {"sub": email, "user_id": str(user_id), "exp": expire}
+    payload = {"sub": email, "user_id": str(user_id), "roles": roles, "exp": expire}
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
@@ -64,9 +89,10 @@ def verify_token(token: str) -> TokenData:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email = payload.get("sub")
         user_id = payload.get("user_id")
+        roles = payload.get("roles", [])
         if not email or not user_id:
             raise AuthenticationError()
-        return TokenData(user_id=user_id)
+        return TokenData(user_id=user_id, roles=roles)
     except jwt.PyJWTError as exc:
         raise AuthenticationError() from exc
 
@@ -79,9 +105,10 @@ def login_for_access_token(form_data, db: Session) -> Token:
     access_token = create_access_token(
         user.email,
         user.id,
+        get_user_role_names(user),
         timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    return Token(access_token=access_token, token_type="bearer")
+    return Token(access_token=access_token, token_type="bearer", roles=get_user_role_names(user))
 
 
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: DbSession) -> User:
@@ -93,3 +120,16 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: DbSessio
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def require_roles(*required_roles: str):
+    def dependency(current_user: CurrentUser) -> User:
+        user_roles = set(get_user_role_names(current_user))
+        if not any(role in user_roles for role in required_roles):
+            raise AuthorizationError()
+        return current_user
+
+    return dependency
+
+
+AdminUser = Annotated[User, Depends(require_roles(ADMIN_ROLE_NAME))]

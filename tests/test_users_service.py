@@ -3,6 +3,7 @@ from uuid import uuid4
 import pytest
 
 from app.core.exceptions import InvalidPasswordError, PasswordMismatchError, UserNotFoundError
+from app.models.role import Role
 from app.models.user import User
 from app.schemas.users.request import PasswordChange
 from app.services import auth_services as auth_service
@@ -62,3 +63,13 @@ def test_change_password_mismatch(db_session, test_user):
             new_password_confirm="differentpassword"
         )
         users_service.change_password(db_session, test_user.id, password_change)
+
+
+def test_add_role_to_user(db_session, test_user):
+    db_session.add(Role(name="user"))
+    db_session.add(Role(name="admin"))
+    db_session.add(test_user)
+    db_session.commit()
+
+    updated_user = users_service.add_role_to_user(db_session, test_user.id, "admin")
+    assert "admin" in [role.name for role in updated_user.roles]

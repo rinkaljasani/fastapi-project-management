@@ -21,7 +21,7 @@ class Todo(Base):
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    description = Column(String, nullable=False)
+    description = Column(String(500), nullable=False)
     due_date = Column(DateTime, nullable=True)
     is_completed = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
