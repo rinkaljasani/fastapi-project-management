@@ -17,7 +17,7 @@ def test_register_and_login_flow(client: TestClient):
 
     # Test successful login
     login_response = client.post(
-        "/auth/token",
+        "/auth/login",
         data={
             "username": register_data.email,
             "password": register_data.password,
@@ -33,7 +33,7 @@ def test_register_and_login_flow(client: TestClient):
 def test_login_failures(client: TestClient):
     # Test login with non-existent user
     response = client.post(
-        "/auth/token",
+        "/auth/login",
         data={
             "username": "nonexistent@example.com",
             "password": "wrongpassword",
@@ -44,7 +44,7 @@ def test_login_failures(client: TestClient):
 
     # Test login with wrong password
     response = client.post(
-        "/auth/token",
+        "/auth/login",
         data={
             "username": "test.user@example.com",
             "password": "wrongpassword",

@@ -101,7 +101,7 @@ def auth_headers(client):
     assert response.status_code == 201
 
     response = client.post(
-        "/auth/token",
+        "/auth/login",
         data={
             "username": "test.user@example.com",
             "password": "testpassword123",
@@ -121,7 +121,7 @@ def admin_auth_headers(client, db_session, admin_user):
     db_session.commit()
 
     response = client.post(
-        "/auth/token",
+        "/auth/login",
         data={
             "username": "admin@example.com",
             "password": "adminpassword123",

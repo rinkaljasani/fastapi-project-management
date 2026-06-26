@@ -15,9 +15,13 @@ from app.models.role import Role
 from app.models.user import User
 from app.schemas.auth.request import RegisterUserRequest, TokenData
 from app.schemas.auth.response import Token
+from fastapi import HTTPException
+
+from app.services.email_services import send_verification_email
+from app.core.mail import create_verification_token
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 DEFAULT_ROLE_NAME = "user"
 ADMIN_ROLE_NAME = "admin"
 
@@ -49,7 +53,7 @@ def get_user_role_names(user: User) -> list[str]:
     return sorted(role.name for role in user.roles)
 
 
-def register_user(db: Session, register_user_request: RegisterUserRequest) -> User:
+async def register_user(db: Session, register_user_request: RegisterUserRequest) -> User:
     ensure_default_roles(db)
     existing_user = db.query(User).filter(User.email == register_user_request.email).first()
     if existing_user:
@@ -66,6 +70,17 @@ def register_user(db: Session, register_user_request: RegisterUserRequest) -> Us
     db.add(user)
     db.commit()
     db.refresh(user)
+    token = create_verification_token(user.email)
+
+    verification_link = (
+        f"http://localhost:8000/auth/verify-email?token={token}"
+    )
+
+    await send_verification_email(
+        user.email,
+        verification_link
+    )
+
     return user
 
 
@@ -101,7 +116,12 @@ def login_for_access_token(form_data, db: Session) -> Token:
     user = authenticate_user(form_data.username, form_data.password, db)
     if not user:
         raise AuthenticationError("Incorrect email or password")
-
+    
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Please verify your email first"
+        )
     access_token = create_access_token(
         user.email,
         user.id,

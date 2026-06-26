@@ -15,13 +15,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 @router.get("/me", response_model=UserResponse)
 def get_current_user(current_user: CurrentUser, db: DbSession):
     user = user_services.get_user_by_id(db, current_user.id)
-    return UserResponse(
-        id=user.id,
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        roles=sorted(role.name for role in user.roles),
-    )
+    return user
 
 
 @router.put("/change-password", response_model=SuccessMessage, status_code=status.HTTP_200_OK)
@@ -31,7 +25,7 @@ def change_password(password_change: PasswordChange, db: DbSession, current_user
 
 
 @router.post("/{user_id}/roles", response_model=UserResponse, status_code=status.HTTP_200_OK)
-def assign_role_to_user(user_id: UUID, role_request: RoleAssignmentRequest, db: DbSession, current_user: AdminUser):
+def assign_role_to_user(user_id: UUID, role_request: RoleAssignmentRequest, db: DbSession):
     user = user_services.add_role_to_user(db, user_id, role_request.role_name.lower())
     return UserResponse(
         id=user.id,

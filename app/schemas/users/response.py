@@ -9,5 +9,6 @@ class UserResponse(BaseModel):
     first_name: str
     last_name: str
     roles: list[str]
+    is_verified : str 
 
     model_config = ConfigDict(from_attributes=True)
